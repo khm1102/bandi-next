@@ -1,0 +1,36 @@
+# 운영 예시: 앱 + PostgreSQL. 실제 비밀값은 .env.production(저장소 제외)에서 주입한다.
+# Neon 등 외부 PostgreSQL을 쓰면 postgres 서비스를 제거하고 DATABASE_URL만 바꾸면 된다.
+# 파일 저장소는 로컬 영구 볼륨(/data/bandi)만 사용한다. 서버리스 환경에는 배포하지 않는다.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      FILE_STORAGE_ROOT: /data/bandi
+      SCHOOL_SSO_MODE: real
+    ports:
+      - "3000:3000"
+    volumes:
+      - bandi-files:/data/bandi
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bandi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 필요}
+      POSTGRES_DB: bandi
+    volumes:
+      - bandi-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bandi -d bandi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  bandi-files:
+  bandi-pg:

@@ -1,0 +1,2 @@
+ALTER TABLE "file_retirement_queue" DROP CONSTRAINT "ck_file_retirement_reason";--> statement-breakpoint
+ALTER TABLE "file_retirement_queue" ADD CONSTRAINT "ck_file_retirement_reason" CHECK ("file_retirement_queue"."reason" in ('PROFILE_PHOTO', 'LINK_PREVIEW_IMAGE', 'ACTIVITY_PHOTO'));

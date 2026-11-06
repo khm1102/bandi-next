@@ -1,0 +1,1 @@
+ALTER TABLE "file_retirement_queue" DROP CONSTRAINT "file_retirement_queue_stored_file_id_stored_file_id_fk";

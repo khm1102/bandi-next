@@ -1,0 +1,23 @@
+# 로컬 개발용 PostgreSQL. 호스트 포트 5433 (타 프로젝트의 5432·3307과 충돌 회피).
+# 오브젝트 스토리지(MinIO/S3)는 사용하지 않는다. 파일은 FILE_STORAGE_ROOT 로컬 볼륨에 저장한다.
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bandi
+      POSTGRES_PASSWORD: bandi1234
+      POSTGRES_DB: bandi
+    ports:
+      - "5433:5432"
+    volumes:
+      - bandi-next-pg:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bandi -d bandi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  bandi-next-pg:
