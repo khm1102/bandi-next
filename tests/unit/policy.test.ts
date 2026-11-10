@@ -45,4 +45,10 @@ describe("접근 정책 (Java MemberAccessContext 이식)", () => {
     expect(ctx("MEMBER").canChangeOwnTeam(2)).toBe(false);
     expect(ctx("MEMBER", 3, "SUSPENDED").canChangeOwnTeam(1)).toBe(false);
   });
+
+  it("본인 기수 변경도 활성 상태의 본인만 가능하다", () => {
+    expect(ctx("MEMBER").canChangeOwnCohort(1)).toBe(true);
+    expect(ctx("MEMBER").canChangeOwnCohort(2)).toBe(false);
+    expect(ctx("MEMBER", 3, "SUSPENDED").canChangeOwnCohort(1)).toBe(false);
+  });
 });

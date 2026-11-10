@@ -218,7 +218,7 @@ export function createMemberService(deps: MemberServiceDeps) {
         const actor = await lockMember(tx, actorId);
         const target = actorId === input.memberId ? actor : await lockMember(tx, input.memberId);
         const access = accessOf(actor);
-        if (!access.canManageGlobal() && !access.canManageTeam(target.teamId)) {
+        if (!access.canChangeOwnCohort(target.id) && !access.canManageGlobal() && !access.canManageTeam(target.teamId)) {
           throw new MemberManagementForbiddenError();
         }
         validateCohortChange(target.cohortId, input.newCohortId);

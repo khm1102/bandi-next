@@ -94,12 +94,34 @@ describe("팀 변경", () => {
 });
 
 describe("기수 변경", () => {
-  it("ADMIN과 대상의 팀 LEADER만 변경할 수 있다", async () => {
+  it("다른 멤버의 기수는 ADMIN과 대상의 팀 LEADER만 변경할 수 있다", async () => {
     const [c2] = await db.insert(cohort).values({ name: "1-2" }).returning();
     await svc().changeCohort(leaderA, { memberId: memberA, newCohortId: c2.id, reason: "r" });
     await expect(svc().changeCohort(leaderA, { memberId: memberB, newCohortId: c2.id, reason: "r" })).rejects.toMatchObject({ code: "MEMBER_MANAGEMENT_FORBIDDEN" });
-    await expect(svc().changeCohort(memberA, { memberId: memberA, newCohortId: cohortId, reason: "r" })).rejects.toMatchObject({ code: "MEMBER_MANAGEMENT_FORBIDDEN" });
+    await expect(svc().changeCohort(memberA, { memberId: memberB, newCohortId: c2.id, reason: "r" })).rejects.toMatchObject({ code: "MEMBER_MANAGEMENT_FORBIDDEN" });
     await svc().changeCohort(admin, { memberId: memberB, newCohortId: c2.id, reason: "r" });
+  });
+
+  it("일반 멤버는 사유와 함께 본인 기수를 바꿀 수 있고 이력이 남는다", async () => {
+    const [c2] = await db.insert(cohort).values({ name: "1-2" }).returning();
+    await svc().changeCohort(memberA, { memberId: memberA, newCohortId: c2.id, reason: "기수 정정" });
+    expect((await db.select().from(member).where(eq(member.id, memberA)))[0].cohortId).toBe(c2.id);
+    const history = await db.select().from(memberChangeHistory).where(eq(memberChangeHistory.memberId, memberA));
+    expect(history.at(-1)).toMatchObject({ field: "COHORT", oldValue: String(cohortId), newValue: String(c2.id), reason: "기수 정정", changedByMemberId: memberA });
+  });
+
+  it("본인 기수 변경도 사유가 필요하고, 운영하지 않는 기수와 같은 기수는 거부한다", async () => {
+    const [closed] = await db.insert(cohort).values({ name: "0-9", isActive: false }).returning();
+    await expect(svc().changeCohort(memberA, { memberId: memberA, newCohortId: closed.id, reason: "r" })).rejects.toBeDefined();
+    await expect(svc().changeCohort(memberA, { memberId: memberA, newCohortId: cohortId, reason: "r" })).rejects.toBeDefined();
+    const [c2] = await db.insert(cohort).values({ name: "1-2" }).returning();
+    await expect(svc().changeCohort(memberA, { memberId: memberA, newCohortId: c2.id, reason: " " })).rejects.toBeDefined();
+  });
+
+  it("정지된 멤버는 본인 기수도 바꿀 수 없다", async () => {
+    const suspended = await add("8", "정지2", "MEMBER", 3, "SUSPENDED");
+    const [c2] = await db.insert(cohort).values({ name: "1-2" }).returning();
+    await expect(svc().changeCohort(suspended, { memberId: suspended, newCohortId: c2.id, reason: "r" })).rejects.toMatchObject({ code: "MEMBER_MANAGEMENT_FORBIDDEN" });
   });
 });
 
