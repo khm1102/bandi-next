@@ -1,4 +1,7 @@
-# 로컬 개발용 PostgreSQL. 호스트 포트 5433 (타 프로젝트의 5432·3307과 충돌 회피).
+# 로컬 실행용 Docker 구성.
+#   pnpm db:up      → PostgreSQL만 (개발 서버는 호스트에서 pnpm dev)
+#   pnpm docker:up  → PostgreSQL + 앱 컨테이너(운영과 같은 이미지, 시작 시 마이그레이션) — http://localhost:3000
+# 호스트 포트 5433 (타 프로젝트의 5432·3307과 충돌 회피).
 # 오브젝트 스토리지(MinIO/S3)는 사용하지 않는다. 파일은 FILE_STORAGE_ROOT 로컬 볼륨에 저장한다.
 services:
   postgres:
@@ -19,5 +22,34 @@ services:
       timeout: 3s
       retries: 10
 
+  # 앱 컨테이너는 profile로 분리해 `pnpm db:up`에서는 뜨지 않는다.
+  app:
+    profiles: ["app"]
+    build: .
+    image: bandi-next:local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://bandi:bandi1234@postgres:5432/bandi
+      FILE_STORAGE_ROOT: /data/bandi
+      # 운영 모드는 개발 기본 비밀값을 거부한다. .env의 APP_LOGIN_ATTEMPT_HASH_SECRET(16자 이상)을 쓴다.
+      LOGIN_ATTEMPT_HASH_SECRET: ${APP_LOGIN_ATTEMPT_HASH_SECRET:?.env에 APP_LOGIN_ATTEMPT_HASH_SECRET(16자 이상)을 설정하세요}
+      SCHOOL_SSO_MODE: real
+      TRUST_PROXY: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - bandi-next-files:/data/bandi
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
 volumes:
   bandi-next-pg:
+  bandi-next-files:
