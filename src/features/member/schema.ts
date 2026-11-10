@@ -3,6 +3,7 @@ import {
   char,
   check,
   index,
+  text,
   integer,
   pgTable,
   uniqueIndex,
@@ -70,6 +71,9 @@ export const member = pgTable(
     status: varchar("status", { length: 30 }).notNull(),
     ssoLinkStatus: varchar("sso_link_status", { length: 30 }).notNull(),
     ssoLinkedAt: ts("sso_linked_at"),
+    /** 반디 비밀번호(scrypt 해시). 학교 SSO로 본인 확인을 마친 뒤에만 설정된다. */
+    passwordHash: text("password_hash"),
+    passwordSetAt: ts("password_set_at"),
     lastLoginAt: ts("last_login_at"),
     registeredByMemberId: fkCol("registered_by_member_id").references((): AnyPgColumn => member.id),
     profilePhotoFileId: fkCol("profile_photo_file_id").references(
@@ -174,4 +178,23 @@ export const session = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("idx_session_member").on(t.memberId), index("idx_session_expires").on(t.expiresAt)],
+);
+
+/**
+ * 학교 SSO 인증을 통과한 사람이 반디 비밀번호를 정할 수 있는 일회용 티켓(10분).
+ * 토큰 원문은 쿠키에만 있고 DB에는 해시만 저장한다.
+ */
+export const passwordSetupTicket = pgTable(
+  "password_setup_ticket",
+  {
+    id: pk(),
+    memberId: fkCol("member_id")
+      .notNull()
+      .references(() => member.id),
+    tokenHash: char("token_hash", { length: 64 }).notNull(),
+    expiresAt: ts("expires_at").notNull(),
+    usedAt: ts("used_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("uk_password_setup_ticket_hash").on(t.tokenHash), index("idx_password_setup_ticket_member").on(t.memberId)],
 );

@@ -29,6 +29,13 @@
       "when": 1793995123454,
       "tag": "0003_curved_gideon",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794281692369,
+      "tag": "0004_bouncy_night_thrasher",
+      "breakpoints": true
     }
   ]
 }
