@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { cohort, member } from "../src/features/member/schema";
+import { hashPassword } from "../src/features/member/password";
 
 if (process.env.NODE_ENV === "production") {
   throw new Error("seed-dev는 운영 환경에서 실행할 수 없습니다.");
@@ -26,6 +27,8 @@ const ACCOUNTS = [
 ] as const;
 
 async function main() {
+  // 로컬·E2E 전용 가짜 계정의 반디 비밀번호는 모두 "pw"이다 (정책 검사를 거치지 않는 시드 값).
+  const passwordHash = await hashPassword("pw");
   const pool = new Pool({ connectionString: url });
   const db = drizzle(pool);
   await db.insert(cohort).values({ name: "1-1" }).onConflictDoNothing();
@@ -37,8 +40,10 @@ async function main() {
         ...account,
         department: "Test",
         cohortId: c.id,
-        status: "PRE_REGISTERED",
-        ssoLinkStatus: "WAITING",
+        status: "ACTIVE",
+        ssoLinkStatus: "LINKED",
+        passwordHash,
+        passwordSetAt: new Date(),
       })
       .onConflictDoNothing();
   }

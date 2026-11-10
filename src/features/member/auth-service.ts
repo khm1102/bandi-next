@@ -1,11 +1,14 @@
-import { createHmac } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { createHmac, randomBytes } from "node:crypto";
+import { and, eq, isNull } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { member, memberChangeHistory, schoolLoginAttempt } from "./schema";
+import { hashToken } from "@/lib/session-store";
+import { hashPassword, validateNewPassword, verifyAgainstDummy, verifyPassword } from "./password";
+import { member, memberChangeHistory, passwordSetupTicket, schoolLoginAttempt } from "./schema";
 import type { MemberStatus, Role, SsoLinkStatus } from "./codes";
 import { determineSchoolConnection, type ConnectionOutcome } from "./connection";
 import {
   MemberLoginDeniedError,
+  PasswordSetupExpiredError,
   SchoolAcademicStatusDeniedError,
   SchoolCredentialsInvalidError,
   SchoolIdentityReviewRequiredError,
@@ -36,6 +39,7 @@ export interface AuthServiceDeps {
 }
 
 const SSO_LINK_REASON = "학교 SSO 최초 연결";
+const SETUP_TICKET_TTL_MS = 10 * 60_000;
 
 /**
  * 학교 SSO 인증 → 실패 제한 → 사전 등록 멤버 연결.
@@ -150,34 +154,108 @@ export function createAuthService(deps: AuthServiceDeps) {
     });
   }
 
+  /** 학교 SSO 인증 → 실패 제한 → 사전 등록 멤버 연결. 학교 비밀번호는 어디에도 저장하지 않는다. */
+  async function verifySchool(credentials: SchoolCredentials): Promise<AuthenticatedMember> {
+    await assertAllowed(credentials.studentNo);
+    let identity: SchoolIdentity;
+    try {
+      identity = await sso.authenticate(credentials);
+    } catch (error) {
+      if (error instanceof SchoolCredentialsInvalidError && (await recordFailure(credentials.studentNo))) {
+        throw new SchoolLoginRateLimitedError();
+      }
+      throw error;
+    }
+    await clearFailures(credentials.studentNo);
+    if (identity.studentNo !== credentials.studentNo) {
+      // 입력 학번과 포털 응답 학번이 다르면 신뢰하지 않는다.
+      throw new SchoolIdentityReviewRequiredError();
+    }
+    const { outcome, member: authenticated } = await connectSchoolIdentity(identity);
+    switch (outcome) {
+      case "AUTHENTICATED":
+        return authenticated;
+      case "ACADEMIC_STATUS_DENIED":
+        throw new SchoolAcademicStatusDeniedError();
+      case "IDENTITY_REVIEW_REQUIRED":
+        throw new SchoolIdentityReviewRequiredError();
+      case "MEMBER_STATUS_DENIED":
+        throw new MemberLoginDeniedError();
+    }
+  }
+
+  const ticketRow = async (token: string) => {
+    const [ticket] = await db.select().from(passwordSetupTicket).where(eq(passwordSetupTicket.tokenHash, hashToken(token)));
+    return ticket && ticket.usedAt === null && ticket.expiresAt.getTime() > now().getTime() ? ticket : null;
+  };
+
   return {
-    async authenticate(credentials: SchoolCredentials): Promise<AuthenticatedMember> {
+    /** 학교 SSO 한 번으로 로그인 (최초 연결 검증용). 일상 로그인은 loginWithPassword를 쓴다. */
+    authenticate: verifySchool,
+
+    /** 반디 비밀번호 로그인: 학교 서버를 호출하지 않는다. 실패는 학번별로 센다. */
+    async loginWithPassword(credentials: SchoolCredentials): Promise<AuthenticatedMember> {
       await assertAllowed(credentials.studentNo);
-      let identity: SchoolIdentity;
-      try {
-        identity = await sso.authenticate(credentials);
-      } catch (error) {
-        if (error instanceof SchoolCredentialsInvalidError && (await recordFailure(credentials.studentNo))) {
+      const [row] = await db.select().from(member).where(eq(member.studentNo, credentials.studentNo));
+      // 계정이 없거나 비밀번호가 없어도 같은 비용으로 검증해 응답 시간으로 존재 여부가 드러나지 않게 한다.
+      const ok = row?.passwordHash ? await verifyPassword(credentials.password, row.passwordHash) : await verifyAgainstDummy(credentials.password);
+      if (!ok || !row) {
+        if (await recordFailure(credentials.studentNo)) {
           throw new SchoolLoginRateLimitedError();
         }
-        throw error;
+        throw new SchoolCredentialsInvalidError();
       }
       await clearFailures(credentials.studentNo);
-      if (identity.studentNo !== credentials.studentNo) {
-        // 입력 학번과 포털 응답 학번이 다르면 신뢰하지 않는다.
-        throw new SchoolIdentityReviewRequiredError();
+      if (row.status !== "ACTIVE") {
+        throw new MemberLoginDeniedError();
       }
-      const { outcome, member: authenticated } = await connectSchoolIdentity(identity);
-      switch (outcome) {
-        case "AUTHENTICATED":
-          return authenticated;
-        case "ACADEMIC_STATUS_DENIED":
-          throw new SchoolAcademicStatusDeniedError();
-        case "IDENTITY_REVIEW_REQUIRED":
-          throw new SchoolIdentityReviewRequiredError();
-        case "MEMBER_STATUS_DENIED":
+      await db.update(member).set({ lastLoginAt: now() }).where(eq(member.id, row.id));
+      return { memberId: row.id, role: row.role as Role, teamId: row.teamId };
+    },
+
+    /** 학교 SSO 인증을 통과하면 10분짜리 일회용 비밀번호 설정 티켓을 발급한다 (최초 설정·재설정 공통). */
+    async verifySchoolForPasswordSetup(credentials: SchoolCredentials): Promise<{ token: string; memberId: number }> {
+      const authenticated = await verifySchool(credentials);
+      const token = randomBytes(32).toString("base64url");
+      await db.transaction(async (tx) => {
+        // 이전에 발급한 미사용 티켓은 무효화한다.
+        await tx.delete(passwordSetupTicket).where(and(eq(passwordSetupTicket.memberId, authenticated.memberId), isNull(passwordSetupTicket.usedAt)));
+        await tx.insert(passwordSetupTicket).values({
+          memberId: authenticated.memberId,
+          tokenHash: hashToken(token),
+          expiresAt: new Date(now().getTime() + SETUP_TICKET_TTL_MS),
+        });
+      });
+      return { token, memberId: authenticated.memberId };
+    },
+
+    async isPasswordSetupTicketValid(token: string): Promise<boolean> {
+      return (await ticketRow(token)) !== null;
+    },
+
+    /** 티켓으로 반디 비밀번호를 정한다. 정책 위반이면 티켓을 소모하지 않는다. */
+    async setPasswordWithTicket(token: string, password: string, confirm: string): Promise<AuthenticatedMember> {
+      return db.transaction(async (tx) => {
+        const [ticket] = await tx
+          .select()
+          .from(passwordSetupTicket)
+          .where(eq(passwordSetupTicket.tokenHash, hashToken(token)))
+          .for("update");
+        const current = now();
+        if (!ticket || ticket.usedAt !== null || ticket.expiresAt.getTime() <= current.getTime()) {
+          throw new PasswordSetupExpiredError();
+        }
+        const [row] = await tx.select().from(member).where(eq(member.id, ticket.memberId)).for("update");
+        if (!row || row.status !== "ACTIVE") {
           throw new MemberLoginDeniedError();
-      }
+        }
+        validateNewPassword(row.studentNo, password, confirm);
+        const hash = await hashPassword(password);
+        await tx.update(member).set({ passwordHash: hash, passwordSetAt: current, lastLoginAt: current }).where(eq(member.id, row.id));
+        await tx.update(passwordSetupTicket).set({ usedAt: current }).where(eq(passwordSetupTicket.id, ticket.id));
+        await tx.delete(schoolLoginAttempt).where(eq(schoolLoginAttempt.studentNoHash, hashStudentNo(row.studentNo)));
+        return { memberId: row.id, role: row.role as Role, teamId: row.teamId };
+      });
     },
   };
 }

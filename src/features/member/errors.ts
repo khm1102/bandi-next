@@ -6,7 +6,8 @@ export type LoginErrorCode =
   | "link-pending"
   | "academic-restricted"
   | "member-restricted"
-  | "school-unavailable";
+  | "school-unavailable"
+  | "password-setup-expired";
 
 /** HTTP 상태로 매핑되는 오류 분류. */
 export type ErrorKind = "invalid" | "forbidden" | "not-found" | "conflict";
@@ -61,6 +62,11 @@ export class MemberLoginDeniedError extends LoginError {
 export class SchoolSsoUnavailableError extends LoginError {
   constructor() {
     super("school-unavailable");
+  }
+}
+export class PasswordSetupExpiredError extends LoginError {
+  constructor() {
+    super("password-setup-expired");
   }
 }
 export class SchoolSsoResponseChangedError extends LoginError {
