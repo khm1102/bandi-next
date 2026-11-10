@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { Card } from "@/components/ui";
+import { Button } from "@/components/bandi/button";
+import { PageHead } from "@/components/bandi/page-head";
 import { assetService } from "@/features/asset/instance";
 import { guard } from "@/lib/page-errors";
 import { requireRole } from "@/lib/session";
@@ -14,23 +15,26 @@ export default async function EditPropPage({ params }: PageProps<"/props/[id]/ed
   const item = await guard(assetService().lookupItem(principal.memberId, id));
   return (
     <>
-      <h1 className="text-2xl font-black tracking-tight">품목 수정</h1>
-      <Card>
-        <AssetEditor
-          values={{
-            assetItemId: item.id,
-            name: item.name,
-            category: item.category,
-            trackingType: item.trackingType,
-            ownerType: item.ownerType as "CLUB" | "MEMBER" | "EXTERNAL",
-            ownerStudentNo: "",
-            externalOwnerName: item.externalOwnerName ?? "",
-            totalQuantity: item.totalQuantity,
-            storageLocation: item.storageLocation,
-            note: item.note ?? "",
-          }}
-        />
-      </Card>
+      <div className="mx-auto max-w-5xl">
+        <PageHead title="소품·장비" description="이름과 사진부터 등록하고, 필요한 정보만 더 입력하세요.">
+          <Button variant="outline" href="/props">목록으로</Button>
+        </PageHead>
+      </div>
+      <AssetEditor
+        values={{
+          assetItemId: item.id,
+          name: item.name,
+          category: item.category,
+          trackingType: item.trackingType,
+          ownerType: item.ownerType as "CLUB" | "MEMBER" | "EXTERNAL",
+          ownerStudentNo: "",
+          externalOwnerName: item.externalOwnerName ?? "",
+          totalQuantity: item.totalQuantity,
+          storageLocation: item.storageLocation,
+          note: item.note ?? "",
+        }}
+      />
+
     </>
   );
 }

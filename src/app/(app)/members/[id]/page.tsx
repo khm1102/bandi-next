@@ -1,4 +1,7 @@
 import { notFound } from "next/navigation";
+import { Button } from "@/components/bandi/button";
+import { Badge } from "@/components/bandi/badge";
+import { PageHead } from "@/components/bandi/page-head";
 import { Card } from "@/components/ui";
 import { MEMBER_STATUSES, ROLES } from "@/features/member/codes";
 import { memberService } from "@/features/member/instance";
@@ -28,13 +31,15 @@ export default async function MemberDetailPage({ params }: PageProps<"/members/[
   const [member, histories, teams, cohorts] = data;
   return (
     <>
-      <h1 className="text-2xl font-black tracking-tight">{member.name}</h1>
-      <Card>
-        <p className="text-sm">
-          {member.studentNo} · {ROLE_LABEL[member.role]} · {STATUS_LABEL[member.status]} · 휴대폰{" "}
-          {member.phoneNumber ?? "-"}
-        </p>
-      </Card>
+      <PageHead title={member.name} description="팀·기수·권한·활동 상태는 한 항목씩 사유와 함께 변경합니다.">
+        <Button variant="outline" href="/members">멤버 목록</Button>
+      </PageHead>
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm">
+        <span className="font-bold tabular-nums">{member.studentNo}</span>
+        <Badge tone="accent">{ROLE_LABEL[member.role]}</Badge>
+        <Badge tone="success">{STATUS_LABEL[member.status]}</Badge>
+        <span className="text-muted-foreground">휴대폰 {member.phoneNumber ?? "-"}</span>
+      </div>
       <MemberAdminForms
         member={{ id: member.id, teamId: member.teamId, cohortId: member.cohortId, role: member.role, status: member.status }}
         teams={teams}
@@ -44,7 +49,7 @@ export default async function MemberDetailPage({ params }: PageProps<"/members/[
         roleLabels={ROLE_LABEL}
         statusLabels={STATUS_LABEL}
       />
-      <Card title="변경 이력">
+      <div id="history" className="mt-4"><Card title="변경 이력">
         <ul className="space-y-2 text-sm" data-testid="history-list">
           {histories.length === 0 ? <li className="text-muted-foreground">이력이 없습니다.</li> : null}
           {histories.map((h) => (
@@ -53,7 +58,7 @@ export default async function MemberDetailPage({ params }: PageProps<"/members/[
             </li>
           ))}
         </ul>
-      </Card>
+      </Card></div>
     </>
   );
 }

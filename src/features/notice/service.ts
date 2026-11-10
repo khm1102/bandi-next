@@ -1,3 +1,4 @@
+import { alias } from "drizzle-orm/pg-core";
 import { and, asc, desc, eq, gt, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { koSort } from "@/db/columns";
 import type { Db, DbOrTx } from "@/db/types";
@@ -189,6 +190,7 @@ export function createNoticeService(deps: NoticeServiceDeps) {
     createdByName: row.creatorName,
     publishStartAt: row.n.publishStartAt,
     publishEndAt: row.n.publishEndAt,
+    updatedAt: row.n.updatedAt,
     isRead: row.readAt != null,
   });
 
@@ -347,11 +349,13 @@ export function createNoticeService(deps: NoticeServiceDeps) {
     async lookupReadable(actorId: number, noticeId: number) {
       const access = await requireReader(actorId);
       const current = now();
+      const publisher = alias(member, "publisher");
       const [row] = await db
-        .select({ n: internalNotice, teamName: team.name, creatorName: member.name })
+        .select({ n: internalNotice, teamName: team.name, creatorName: member.name, publisherName: publisher.name })
         .from(internalNotice)
         .leftJoin(team, eq(team.id, internalNotice.teamId))
         .innerJoin(member, eq(member.id, internalNotice.createdByMemberId))
+        .leftJoin(publisher, eq(publisher.id, internalNotice.publishedByMemberId))
         .where(and(eq(internalNotice.id, noticeId), readableCondition(access, current)));
       if (!row) throw new NoticeNotFoundError();
       await db
@@ -371,6 +375,9 @@ export function createNoticeService(deps: NoticeServiceDeps) {
         html,
         attachments,
         createdByMemberId: row.n.createdByMemberId,
+        publishedByName: row.publisherName,
+        updatedAt: row.n.updatedAt,
+        canManage: canManage(access, row.n.targetScope as NoticeScope, row.n.teamId),
         canIssueShare:
           row.n.createdByMemberId === actorId || canManage(access, row.n.targetScope as NoticeScope, row.n.teamId),
         shared: row.n.shareToken !== null,
@@ -408,11 +415,15 @@ export function createNoticeService(deps: NoticeServiceDeps) {
     /** 관리 상세: 원문과 미리보기 HTML, 첨부, 공유 상태. 읽음 기록은 남기지 않는다. */
     async lookupManageable(actorId: number, noticeId: number) {
       const access = await actorAccess(db, actorId);
+      const updater = alias(member, "updater");
+      const publisher = alias(member, "publisher");
       const [row] = await db
-        .select({ n: internalNotice, teamName: team.name, creatorName: member.name })
+        .select({ n: internalNotice, teamName: team.name, creatorName: member.name, updaterName: updater.name, publisherName: publisher.name })
         .from(internalNotice)
         .leftJoin(team, eq(team.id, internalNotice.teamId))
         .innerJoin(member, eq(member.id, internalNotice.createdByMemberId))
+        .leftJoin(updater, eq(updater.id, internalNotice.updatedByMemberId))
+        .leftJoin(publisher, eq(publisher.id, internalNotice.publishedByMemberId))
         .where(and(eq(internalNotice.id, noticeId), isNull(internalNotice.deletedAt)));
       if (!row) throw new NoticeNotFoundError();
       assertManage(access, row.n.targetScope as NoticeScope, row.n.teamId);
@@ -422,6 +433,8 @@ export function createNoticeService(deps: NoticeServiceDeps) {
         body: row.n.body,
         html: renderMarkdown(row.n.body, { imageUrls: imageUrlMap(noticeId, attachments, true), allowExternalImages: true }),
         attachments,
+        updatedByName: row.updaterName,
+        publishedByName: row.publisherName,
         shared: row.n.shareToken !== null,
       };
     },

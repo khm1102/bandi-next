@@ -29,6 +29,7 @@ export interface EventView {
   isAllDay: boolean;
   place: string | null;
   color: string;
+  updatedAt: Date;
 }
 
 const toView = (row: typeof calendarEvent.$inferSelect): EventView => ({
@@ -41,6 +42,7 @@ const toView = (row: typeof calendarEvent.$inferSelect): EventView => ({
   isAllDay: row.isAllDay,
   place: row.place,
   color: row.color,
+  updatedAt: row.updatedAt,
 });
 
 export function createCalendarService(deps: CalendarServiceDeps) {

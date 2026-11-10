@@ -49,9 +49,17 @@ export interface ReviewFilter {
   status?: ActivityStatus;
   teamId?: number;
   keyword?: string;
+  recordType?: "SIMPLE" | "HWPX";
   from?: Date;
   to?: Date;
   page?: number;
+}
+
+/** 기록 형식 필터: HWPX 내역서는 보고서 입력 스냅샷이 있는 기록이다. */
+function recordTypeCondition(recordType?: "SIMPLE" | "HWPX"): SQL | undefined {
+  if (!recordType) return undefined;
+  const exists = sql`exists (select 1 from activity_report_document d where d.activity_record_id = ${activityRecord.id})`;
+  return recordType === "HWPX" ? exists : sql`not ${exists}`;
 }
 
 export function createActivityService(deps: ActivityServiceDeps) {
@@ -147,7 +155,10 @@ export function createActivityService(deps: ActivityServiceDeps) {
     await tx.insert(activityReviewHistory).values({ activityRecordId: recordId, previousStatus: previous, newStatus: next, comment, reviewedByMemberId: actorId, reviewedAt: at });
   }
 
-  const toSummary = (r: { rec: Row; teamName: string; authorName: string }) => ({
+  const toSummary = (r: { rec: Row; teamName: string; authorName: string; coverFileId?: number | null; documentFileId?: number | null; isReport?: boolean }) => ({
+    coverFileId: r.coverFileId ?? null,
+    documentFileId: r.documentFileId ?? null,
+    recordType: (r.isReport ? "HWPX" : "SIMPLE") as "HWPX" | "SIMPLE",
     id: r.rec.id,
     teamId: r.rec.teamId,
     teamName: r.teamName,
@@ -164,7 +175,14 @@ export function createActivityService(deps: ActivityServiceDeps) {
     const p = Math.max(1, Math.floor(page));
     const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(activityRecord).where(where);
     const rows = await db
-      .select({ rec: activityRecord, teamName: team.name, authorName: member.name })
+      .select({
+        rec: activityRecord,
+        teamName: team.name,
+        authorName: member.name,
+        coverFileId: sql<number | null>`(select f.stored_file_id from activity_record_file f where f.activity_record_id = ${activityRecord.id} and f.file_role = 'EVIDENCE' and f.replaced_at is null order by f.display_order, f.id limit 1)`,
+        documentFileId: sql<number | null>`(select f.stored_file_id from activity_record_file f where f.activity_record_id = ${activityRecord.id} and f.file_role = 'DOCUMENT' and f.replaced_at is null order by f.id desc limit 1)`,
+        isReport: sql<boolean>`exists (select 1 from activity_report_document d where d.activity_record_id = ${activityRecord.id})`,
+      })
       .from(activityRecord)
       .innerJoin(team, eq(team.id, activityRecord.teamId))
       .innerJoin(member, eq(member.id, activityRecord.createdByMemberId))
@@ -183,6 +201,7 @@ export function createActivityService(deps: ActivityServiceDeps) {
       inArray(activityRecord.status, REVIEW_STATUSES),
       context.canManageGlobal() ? (filter.teamId ? eq(activityRecord.teamId, filter.teamId) : undefined) : eq(activityRecord.teamId, context.teamId),
       filter.status ? eq(activityRecord.status, filter.status) : undefined,
+      recordTypeCondition(filter.recordType),
       filter.from ? gte(activityRecord.activityAt, filter.from) : undefined,
       filter.to ? lte(activityRecord.activityAt, filter.to) : undefined,
       keyword ? or(ilike(activityRecord.title, like(keyword)), ilike(member.name, like(keyword))) : undefined,
@@ -445,7 +464,7 @@ export function createActivityService(deps: ActivityServiceDeps) {
     },
 
     /** 최종 승인된 기록은 모든 활성 멤버가 열람한다. */
-    async searchArchive(actorId: number, filter: { keyword?: string; teamId?: number; page?: number } = {}) {
+    async searchArchive(actorId: number, filter: { keyword?: string; teamId?: number; recordType?: "SIMPLE" | "HWPX"; page?: number } = {}) {
       await reader(db, actorId);
       const keyword = filter.keyword?.trim();
       return list(
@@ -453,6 +472,7 @@ export function createActivityService(deps: ActivityServiceDeps) {
           isNull(activityRecord.deletedAt),
           eq(activityRecord.status, "APPROVED"),
           filter.teamId ? eq(activityRecord.teamId, filter.teamId) : undefined,
+          recordTypeCondition(filter.recordType),
           keyword ? or(ilike(activityRecord.title, like(keyword)), ilike(member.name, like(keyword))) : undefined,
         ),
         filter.page ?? 1,

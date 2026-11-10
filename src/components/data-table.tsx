@@ -20,13 +20,13 @@ export function DataTable<T>({ caption, columns, rows, rowKey, testId, empty = "
   empty?: string;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border bg-card">
-      <table className="w-full border-collapse text-left text-sm" data-testid={testId}>
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-left [&_th]:whitespace-nowrap [&_th]:border-b [&_th]:bg-secondary [&_th]:px-4 [&_th]:py-3 [&_th]:text-xs [&_th]:font-extrabold [&_th]:text-muted-foreground [&_td]:border-b [&_td]:px-4 [&_td]:py-3 [&_td]:text-sm [&_tbody_tr]:transition-colors [&_tbody_tr]:hover:bg-secondary/50 [&_tbody_tr:last-child_td]:border-b-0" data-testid={testId}>
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column.header} scope="col" className="whitespace-nowrap border-b bg-secondary px-4 py-3 text-xs font-extrabold text-muted-foreground">
+              <th key={column.header} scope="col">
                 {column.header}
               </th>
             ))}
@@ -41,9 +41,9 @@ export function DataTable<T>({ caption, columns, rows, rowKey, testId, empty = "
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={rowKey(row)} className="transition-colors hover:bg-secondary/50 [&:last-child>td]:border-b-0">
+              <tr key={rowKey(row)}>
                 {columns.map((column) => (
-                  <td key={column.header} className={`border-b px-4 py-3 ${column.className ?? ""}`}>
+                  <td key={column.header} className={column.className}>
                     {column.cell(row)}
                   </td>
                 ))}

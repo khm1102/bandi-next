@@ -14,9 +14,9 @@ async function resourceId(title: string): Promise<number> {
 
 async function write(page: Page, title: string, body: string) {
   await page.goto("/resources/write");
-  await page.getByLabel("제목").fill(title);
-  await page.getByLabel("본문 (Markdown)").fill(body);
-  await page.getByRole("button", { name: "저장" }).click();
+  await page.getByLabel("제목", { exact: true }).fill(title);
+  await page.getByRole("textbox", { name: "본문", exact: true }).fill(body);
+  await page.getByRole("button", { name: "자료 저장" }).click();
   await expect(page).toHaveURL(/\/resources\/\d+$/);
 }
 
@@ -34,7 +34,7 @@ test.describe("자료실", () => {
     await loginAs(other, ACCOUNTS.memberB);
     await other.goto("/resources?q=대본");
     await expect(other.getByTestId("resource-list")).toContainText("E2E 대본 자료");
-    await other.getByRole("link", { name: /E2E 대본 자료/ }).click();
+    await other.getByTestId("resource-list").locator("article", { hasText: "E2E 대본 자료" }).getByRole("link", { name: "상세 보기" }).click();
     await expect(other.getByRole("heading", { name: "1막" })).toBeVisible();
     await expect(other.getByRole("link", { name: "수정" })).toHaveCount(0);
   });
@@ -52,11 +52,11 @@ test.describe("자료실", () => {
     }
 
     await page.goto(`/resources/${id}/edit`);
-    await page.getByLabel("제목").fill("E2E 수정 완료");
-    await page.getByRole("button", { name: "저장" }).click();
+    await page.getByLabel("제목", { exact: true }).fill("E2E 수정 완료");
+    await page.getByRole("button", { name: "자료 저장" }).click();
     await expect(page.getByRole("heading", { name: "E2E 수정 완료" })).toBeVisible();
 
-    await page.getByRole("button", { name: "삭제" }).click();
+    await page.getByRole("button", { name: "자료 삭제" }).click();
     await expect(page).toHaveURL(/\/resources$/);
     expect((await page.goto(`/resources/${id}`))?.status()).toBe(404);
   });
@@ -68,8 +68,8 @@ test.describe("자료실", () => {
     const admin = await (await browser.newContext()).newPage();
     await loginAs(admin, ACCOUNTS.admin);
     await admin.goto(`/resources/${id}/edit`);
-    await admin.getByLabel("제목").fill("E2E 운영진이 수정함");
-    await admin.getByRole("button", { name: "저장" }).click();
+    await admin.getByLabel("제목", { exact: true }).fill("E2E 운영진이 수정함");
+    await admin.getByRole("button", { name: "자료 저장" }).click();
     await expect(admin.getByRole("heading", { name: "E2E 운영진이 수정함" })).toBeVisible();
   });
 
@@ -90,11 +90,11 @@ test.describe("자료실", () => {
   test("첨부 파일을 올리고 다른 멤버가 내려받을 수 있다", async ({ page, browser }) => {
     await loginAs(page, ACCOUNTS.memberA);
     await page.goto("/resources/write");
-    await page.getByLabel("제목").fill("E2E 첨부 자료");
-    await page.getByLabel("본문 (Markdown)").fill("첨부 확인");
+    await page.getByLabel("제목", { exact: true }).fill("E2E 첨부 자료");
+    await page.getByRole("textbox", { name: "본문", exact: true }).fill("첨부 확인");
     await page.getByLabel("파일 첨부").setInputFiles({ name: "poster.png", mimeType: "image/png", buffer: PNG });
     await expect(page.getByText("poster.png")).toBeVisible();
-    await page.getByRole("button", { name: "저장" }).click();
+    await page.getByRole("button", { name: "자료 저장" }).click();
     await expect(page).toHaveURL(/\/resources\/\d+$/);
     const href = await page.getByTestId("attachments").getByRole("link", { name: "poster.png" }).getAttribute("href");
     expect(href).toMatch(/^\/api\/resources\/\d+\/files\/\d+\/download$/);
@@ -125,15 +125,15 @@ test.describe("자료실", () => {
   test("제목 공개 링크는 비로그인에게 제목만 보여주고 중단하면 404이다", async ({ page, browser }) => {
     await loginAs(page, ACCOUNTS.memberA);
     await write(page, "E2E 공유 자료", "비밀 본문");
-    await page.getByRole("button", { name: /제목 공개 링크 발급/ }).click();
+    await page.getByRole("button", { name: "공유", exact: true }).click();
     const link = (await page.getByTestId("share-link").textContent())!.trim();
     expect(link).toMatch(/\/share\/resources\/[A-Za-z0-9_-]{43}$/);
     const anonymous = await (await browser.newContext()).newPage();
     await anonymous.goto(link);
     await expect(anonymous.getByRole("heading", { name: "E2E 공유 자료" })).toBeVisible();
     await expect(anonymous.getByText("비밀 본문")).toHaveCount(0);
-    await page.getByRole("button", { name: "공개 링크 중단" }).click();
-    await expect(page.getByTestId("share-revoked")).toContainText("공유 링크를 중단했습니다");
+    await page.getByRole("button", { name: "공유 중단" }).click();
+    await expect(page.getByTestId("share-status")).toContainText("공유 링크를 중단했습니다");
     expect((await anonymous.goto(link))?.status()).toBe(404);
   });
 });

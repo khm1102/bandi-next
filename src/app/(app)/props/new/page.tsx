@@ -1,4 +1,5 @@
-import { Card } from "@/components/ui";
+import { Button } from "@/components/bandi/button";
+import { PageHead } from "@/components/bandi/page-head";
 import { requireRole } from "@/lib/session";
 import { AssetEditor } from "../asset-editor";
 
@@ -9,12 +10,15 @@ export default async function NewPropPage() {
   await requireRole("ADMIN");
   return (
     <>
-      <h1 className="text-2xl font-black tracking-tight">품목 등록</h1>
-      <Card>
-        <AssetEditor
-          values={{ name: "", category: "", trackingType: "QUANTITY", ownerType: "CLUB", ownerStudentNo: "", externalOwnerName: "", totalQuantity: 1, storageLocation: "", note: "" }}
-        />
-      </Card>
+      <div className="mx-auto max-w-5xl">
+        <PageHead title="소품·장비" description="이름과 사진부터 등록하고, 필요한 정보만 더 입력하세요.">
+          <Button variant="outline" href="/props">목록으로</Button>
+        </PageHead>
+      </div>
+      <AssetEditor
+        values={{ name: "", category: "", trackingType: "QUANTITY", ownerType: "CLUB", ownerStudentNo: "", externalOwnerName: "", totalQuantity: 1, storageLocation: "", note: "" }}
+      />
+
     </>
   );
 }

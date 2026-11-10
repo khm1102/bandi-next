@@ -42,6 +42,13 @@ export async function saveNoticeAction(_prev: ActionState, formData: FormData): 
     } else {
       savedId = await noticeService().createDraft(principal.memberId, toInput(formData));
     }
+    // "공지 게시": 저장 직후 게시한다. 예약 게시를 켰다면 입력한 시각(KST)부터 노출된다.
+    if (formData.get("intent") === "publish" && savedId !== null) {
+      const scheduled = formData.get("scheduleEnabled") === "on" ? String(formData.get("publishAt") ?? "") : "";
+      const startAt = scheduled ? parseKst(scheduled) : null;
+      if (startAt && Number.isNaN(startAt.getTime())) throw new InvalidInputError();
+      await noticeService().publish(principal.memberId, savedId, { start: startAt, end: null });
+    }
   });
   if (result.ok && savedId !== null) {
     revalidatePath("/notices", "layout");

@@ -1,7 +1,9 @@
 "use client";
 
+import { ConfirmForm } from "@/components/bandi/confirm-form";
+import { deleteAssetAction } from "@/features/asset/actions";
 import { ActionForm, Card, Field, inputClass } from "@/components/ui";
-import { changeAssetStatusAction, deleteAssetAction, registerUnitAction } from "@/features/asset/actions";
+import { changeAssetStatusAction, registerUnitAction } from "@/features/asset/actions";
 
 export function AdminPanel(props: {
   assetItemId: number;
@@ -41,12 +43,19 @@ export function AdminPanel(props: {
           </ActionForm>
         </Card>
       ) : null}
-      <Card title="품목 삭제">
-        <ActionForm action={deleteAssetAction} submitLabel="삭제">
-          {hidden}
-          <p className="text-sm text-muted-foreground">삭제해도 이력과 개별 장비는 보존되며, 삭제됨 목록에서 복구할 수 있습니다.</p>
-        </ActionForm>
-      </Card>
     </div>
+  );
+}
+
+export function DeleteAssetButton({ assetItemId, name }: { assetItemId: number; name: string }) {
+  return (
+    <ConfirmForm
+      action={deleteAssetAction}
+      confirmMessage={`“${name}” 품목을 삭제할까요? 일반 목록에서 숨겨지고 변경 이력은 보존됩니다.`}
+      label="품목 삭제"
+      className="inline-flex min-h-11 items-center justify-center rounded-md bg-destructive px-4 text-sm font-bold text-destructive-foreground hover:bg-destructive/90"
+    >
+      <input type="hidden" name="assetItemId" value={assetItemId} />
+    </ConfirmForm>
   );
 }

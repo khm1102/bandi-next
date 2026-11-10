@@ -214,6 +214,14 @@ export function createReportService(deps: ReportServiceDeps) {
       return { activityRecordId, hwpxFileId: docRef.id, filename };
     },
 
+    /** 문서 확인자(현재 회장) 이름. 지정되지 않았으면 null. */
+    async presidentName(): Promise<string | null> {
+      return president().catch((error: unknown) => {
+        if (error instanceof PresidentNotConfiguredError) return null;
+        throw error;
+      });
+    },
+
     async lookupDraft(actorId: number, activityRecordId: number) {
       const detail = await activities.lookupManageable(actorId, activityRecordId);
       const [doc] = await db.select().from(activityReportDocument).where(eq(activityReportDocument.activityRecordId, activityRecordId));

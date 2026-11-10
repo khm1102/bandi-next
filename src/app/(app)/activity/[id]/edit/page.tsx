@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
-import { Card } from "@/components/ui";
+import { Button } from "@/components/bandi/button";
+import { PageHead } from "@/components/bandi/page-head";
 import { activityService } from "@/features/activity/instance";
 import { canEdit } from "@/features/activity/model";
 import { memberService } from "@/features/member/instance";
@@ -20,22 +21,27 @@ export default async function EditActivityPage({ params }: PageProps<"/activity/
   const teams = await memberService().searchTeams();
   return (
     <>
-      <h1 className="text-2xl font-black tracking-tight">활동 기록 수정</h1>
-      <Card>
-        <ActivityEditor
-          recordId={record.id}
-          teams={teams}
-          canChooseTeam={false}
-          values={{
-            teamId: record.teamId,
-            activityAt: toKstDateTimeInput(record.activityAt),
-            title: record.title,
-            body: record.body,
-            participantCount: record.participantCount,
-            photos: record.files.filter((f) => f.role !== "DOCUMENT").map((f) => ({ id: f.fileId, name: f.name })),
-          }}
-        />
-      </Card>
+      <div className="mx-auto max-w-3xl">
+        <PageHead title="간단 활동 기록 수정" description="사진은 선택 사항이며, 제출 후 팀장과 관리자가 순서대로 검수합니다.">
+          <Button variant="outline" href="/activity">내 활동 기록</Button>
+        </PageHead>
+        <div className="rounded-lg border bg-card p-5 md:p-7">
+            <ActivityEditor
+              recordId={record.id}
+              teams={teams}
+              canChooseTeam={false}
+              values={{
+                teamId: record.teamId,
+                activityAt: toKstDateTimeInput(record.activityAt),
+                title: record.title,
+                body: record.body,
+                participantCount: record.participantCount,
+                photos: record.files.filter((f) => f.role !== "DOCUMENT").map((f) => ({ id: f.fileId, name: f.name })),
+              }}
+            />
+            </div>
+      </div>
+
     </>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { ActionForm, Card, Field, inputClass } from "@/components/ui";
+import { ActionForm, Field, inputClass } from "@/components/ui";
 import { archiveActivityAction, finalApproveAction, requestRevisionAction, teamApproveAction } from "@/features/activity/actions";
 
+/** 원본 review-detail의 검수 처리 패널. 서버가 단계·권한을 다시 검사한다. */
 export function ReviewActions({
   recordId,
   can,
@@ -17,8 +18,10 @@ export function ReviewActions({
     return null;
   }
   return (
-    <Card title="검수">
-      <div className="grid gap-4 md:grid-cols-2">
+    <section className="mt-6 rounded-lg border bg-secondary/50 p-4">
+      <h3 className="text-sm font-extrabold">검수 처리</h3>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">현재 단계에서 가능한 처리만 표시돼요. 처리 내용은 검수 이력에 남아요.</p>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
         {can.teamApprove ? (
           <ActionForm action={teamApproveAction} submitLabel="팀장 1차 승인">
             {hidden}
@@ -37,8 +40,8 @@ export function ReviewActions({
         {can.requestRevision ? (
           <ActionForm action={requestRevisionAction} submitLabel="보완 요청">
             {hidden}
-            <Field label="보완 요청 사유 (필수)">
-              <input name="comment" required maxLength={500} className={inputClass} />
+            <Field label="보완 사유 (필수)">
+              <textarea name="comment" required maxLength={500} className={`${inputClass} min-h-28 resize-y`} />
             </Field>
           </ActionForm>
         ) : null}
@@ -48,6 +51,6 @@ export function ReviewActions({
           </ActionForm>
         ) : null}
       </div>
-    </Card>
+    </section>
   );
 }
