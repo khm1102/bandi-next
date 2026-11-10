@@ -21,6 +21,7 @@ export interface AccessContext {
   canManageGlobal(): boolean;
   canManageTeam(targetTeamId: number | null): boolean;
   canChangeOwnTeam(targetMemberId: number): boolean;
+  canChangeOwnCohort(targetMemberId: number): boolean;
   canContributeToTeam(targetTeamId: number | null): boolean;
 }
 
@@ -43,6 +44,8 @@ export function accessFor(subject: AccessSubject): AccessContext {
       return admin || (leader && subject.teamId === targetTeamId);
     },
     canChangeOwnTeam: (targetMemberId) => active && subject.memberId === targetMemberId,
+    // 기수도 본인이 사유와 함께 정정할 수 있다 (팀 변경과 같은 규칙).
+    canChangeOwnCohort: (targetMemberId) => active && subject.memberId === targetMemberId,
     canContributeToTeam: (targetTeamId) => {
       if (!active || targetTeamId === null) {
         return false;
