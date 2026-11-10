@@ -11,14 +11,21 @@ Markdown(unified + rehype-sanitize) · HWPX 생성(fflate + @xmldom/xmldom + sha
 ## 로컬 실행
 
 ```bash
-docker compose up -d                  # Postgres (호스트 5433)
-cp .env.example .env                  # 로컬에서는 SCHOOL_SSO_MODE=fake 로 바꾼다
+cp .env.example .env                  # 로컬에서는 SCHOOL_SSO_MODE=fake 로 바꾸면 가짜 계정으로 확인할 수 있다
 pnpm install
-pnpm db:migrate && pnpm db:seed       # 스키마 + 가짜 SSO 계정(MemberA/B, LeaderA/B, AdminX / 비밀번호 pw)
-PORT=3100 pnpm dev
+pnpm dev:up                           # Docker로 Postgres 기동(준비될 때까지 대기) → 마이그레이션 → 개발 서버(http://localhost:3000)
+pnpm db:seed                          # (처음 한 번) 가짜 계정 MemberA/B, LeaderA/B, AdminX / 비밀번호 pw
 ```
 
-`SCHOOL_SSO_MODE=fake`는 로컬·E2E 전용이며 `NODE_ENV=production`에서는 시작 시 거부된다.
+| 명령 | 하는 일 |
+|---|---|
+| `pnpm db:up` / `pnpm db:down` | 개발용 Postgres만 기동·중지 (호스트 포트 5433, 테스트 DB `bandi_test` 자동 생성) |
+| `pnpm dev:up` | `db:up` → `db:migrate` → `next dev` |
+| `pnpm docker:up` | **앱 컨테이너 + Postgres**를 운영과 같은 이미지로 기동 (시작 시 마이그레이션, http://localhost:3000). `.env`의 `APP_LOGIN_ATTEMPT_HASH_SECRET`(16자 이상) 필요 |
+| `pnpm docker:down` | 앱 컨테이너만 중지 (DB는 유지) |
+
+`SCHOOL_SSO_MODE=fake`는 로컬·E2E 전용이며 `NODE_ENV=production`(앱 컨테이너 포함)에서는 시작 시 거부된다.
+개발 서버를 같은 네트워크의 다른 기기(LAN 주소)에서 열어도 동작하도록 이 컴퓨터의 IPv4 주소를 `allowedDevOrigins`로 허용한다.
 
 ## 검증
 
