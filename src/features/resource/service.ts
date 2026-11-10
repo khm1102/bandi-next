@@ -210,6 +210,8 @@ export function createResourceService(deps: ResourceServiceDeps) {
           createdByName: member.name,
           updatedAt: resource.updatedAt,
           fileCount: sql<number>`(select count(*)::int from resource_file rf where rf.resource_id = ${resource.id})`,
+          coverFileId: sql<number | null>`(select rf.stored_file_id from resource_file rf join stored_file sf on sf.id = rf.stored_file_id where rf.resource_id = ${resource.id} and sf.content_type like 'image/%' order by rf.display_order limit 1)`,
+          previewCoverFileId: sql<number | null>`(select p.preview_image_file_id from resource_link_preview p where p.resource_id = ${resource.id} and p.preview_image_file_id is not null order by p.id limit 1)`,
         })
         .from(resource)
         .innerJoin(member, eq(member.id, resource.createdByMemberId))
@@ -221,7 +223,7 @@ export function createResourceService(deps: ResourceServiceDeps) {
         total,
         page,
         pageSize: PAGE_SIZE,
-        items: rows.map((r) => ({ id: r.id, title: r.title, excerpt: r.body.replace(/\s+/g, " ").slice(0, 140), createdByName: r.createdByName, updatedAt: r.updatedAt, fileCount: r.fileCount })),
+        items: rows.map((r) => ({ id: r.id, title: r.title, excerpt: r.body.replace(/\s+/g, " ").slice(0, 140), createdByName: r.createdByName, updatedAt: r.updatedAt, fileCount: r.fileCount, cover: r.coverFileId ? { fileId: r.coverFileId, source: "FILE" as const } : r.previewCoverFileId ? { fileId: r.previewCoverFileId, source: "LINK_PREVIEW" as const } : null })),
       };
     },
 

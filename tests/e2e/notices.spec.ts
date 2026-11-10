@@ -11,12 +11,18 @@ async function noticeId(title: string): Promise<number> {
   return rows[0].id;
 }
 
+/** 관리 상세에서 즉시 게시한다 (게시 시작을 비우면 즉시). */
+async function publish(page: Page) {
+  await page.getByRole("button", { name: "게시", exact: true }).click();
+  await page.getByRole("button", { name: "게시하기" }).click();
+}
+
 async function writeNotice(page: Page, title: string, body: string, scope: "ALL" | "TEAM" = "ALL") {
   await page.goto("/notices/write");
-  await page.getByLabel("제목").fill(title);
-  await page.getByLabel("본문 (Markdown)").fill(body);
-  if (scope === "TEAM") await page.getByLabel("대상").selectOption("TEAM");
-  await page.getByRole("button", { name: "저장" }).click();
+  await page.getByLabel("제목", { exact: true }).fill(title);
+  await page.getByRole("textbox", { name: "본문", exact: true }).fill(body);
+  if (scope === "TEAM") await page.getByLabel("게시 대상").selectOption("TEAM");
+  await page.getByRole("button", { name: "초안 저장" }).click();
   await expect(page).toHaveURL(/\/notices\/manage\/\d+$/);
 }
 
@@ -29,29 +35,34 @@ test.describe("공지", () => {
     await loginAs(page, ACCOUNTS.admin);
     await writeNotice(page, "E2E 전체 공지", "## 안내\n\n**중요** 내용");
     await expect(page.getByTestId("notice-status")).toHaveText("초안");
-    await page.getByRole("button", { name: "게시", exact: true }).click();
+    await publish(page);
     await expect(page.getByTestId("notice-status")).toHaveText("게시 중");
 
     const member = await (await browser.newContext()).newPage();
     await loginAs(member, ACCOUNTS.memberA);
     await member.goto("/notices");
     await expect(member.getByTestId("notice-list")).toContainText("E2E 전체 공지");
-    await expect(member.getByTestId("notice-list")).toContainText("안 읽음");
+    await expect(member.getByTestId("notice-list")).toContainText("미확인");
     await member.getByRole("link", { name: /E2E 전체 공지/ }).click();
     await expect(member.getByRole("heading", { name: "안내" })).toBeVisible();
     await member.goto("/notices?unread=1");
-    await expect(member.getByTestId("notice-list")).not.toContainText("E2E 전체 공지");
+    await expect(member.locator("main").getByText("E2E 전체 공지")).toHaveCount(0);
 
     const id = await noticeId("E2E 전체 공지");
     await page.goto(`/notices/manage/${id}`);
-    await expect(page.getByTestId("read-statuses").getByRole("row", { name: /MemberA.*배우.*확인/ })).toBeVisible();
-    await expect(page.getByTestId("read-statuses").getByRole("row", { name: /MemberB.*무대팀.*미확인/ })).toBeVisible();
+    await page.getByText("멤버별 현황 보기").click();
+    const memberA = page.getByTestId("read-statuses").getByRole("listitem").filter({ hasText: "MemberA" });
+    const memberB = page.getByTestId("read-statuses").getByRole("listitem").filter({ hasText: "MemberB" });
+    await expect(memberA).toContainText("배우");
+    await expect(memberA).not.toContainText("미확인");
+    await expect(memberB).toContainText("무대팀");
+    await expect(memberB).toContainText("미확인");
   });
 
   test("본문에 넣은 스크립트와 이벤트 속성은 렌더링되지 않는다 (XSS)", async ({ page, browser }) => {
     await loginAs(page, ACCOUNTS.admin);
     await writeNotice(page, "E2E XSS 공지", '<script>window.__xss = 1</script>\n\n<img src=x onerror="window.__xss = 2">\n\n[클릭](javascript:window.__xss=3)');
-    await page.getByRole("button", { name: "게시", exact: true }).click();
+    await publish(page);
     await expect(page.getByTestId("notice-status")).toHaveText("게시 중");
 
     const member = await (await browser.newContext()).newPage();
@@ -68,7 +79,7 @@ test.describe("공지", () => {
   test("팀 공지는 다른 팀 멤버에게 보이지 않고 직접 URL도 404이다", async ({ page, browser }) => {
     await loginAs(page, ACCOUNTS.leaderA);
     await writeNotice(page, "E2E 배우팀 공지", "배우팀만", "TEAM");
-    await page.getByRole("button", { name: "게시", exact: true }).click();
+    await publish(page);
     await expect(page.getByTestId("notice-status")).toHaveText("게시 중");
     const id = await noticeId("E2E 배우팀 공지");
 
@@ -80,7 +91,7 @@ test.describe("공지", () => {
     const other = await (await browser.newContext()).newPage();
     await loginAs(other, ACCOUNTS.memberB);
     await other.goto("/notices");
-    await expect(other.getByTestId("notice-list")).not.toContainText("E2E 배우팀 공지");
+    await expect(other.locator("main").getByText("E2E 배우팀 공지")).toHaveCount(0);
     expect((await other.goto(`/notices/${id}`))?.status()).toBe(404);
   });
 
@@ -102,11 +113,11 @@ test.describe("공지", () => {
   test("제목 공개 링크는 비로그인에게 제목만 보여주고 중단하면 404이다", async ({ page, browser }) => {
     await loginAs(page, ACCOUNTS.admin);
     await writeNotice(page, "E2E 공유 제목", "비밀 본문 내용");
-    await page.getByRole("button", { name: "게시", exact: true }).click();
+    await publish(page);
     await expect(page.getByTestId("notice-status")).toHaveText("게시 중");
     const id = await noticeId("E2E 공유 제목");
     await page.goto(`/notices/${id}`);
-    await page.getByRole("button", { name: /제목 공개 링크 발급/ }).click();
+    await page.getByRole("button", { name: "공유", exact: true }).click();
     const link = (await page.getByTestId("share-link").textContent())!.trim();
     expect(link).toMatch(/\/share\/notices\/[A-Za-z0-9_-]{43}$/);
 
@@ -114,26 +125,26 @@ test.describe("공지", () => {
     await anonymous.goto(link);
     await expect(anonymous.getByRole("heading", { name: "E2E 공유 제목" })).toBeVisible();
     await expect(anonymous.getByText("비밀 본문 내용")).toHaveCount(0);
-    await expect(anonymous.getByRole("link", { name: "로그인하고 공지 보기" })).toBeVisible();
+    await expect(anonymous.getByRole("link", { name: "로그인하고 글 보기" })).toBeVisible();
 
-    await page.getByRole("button", { name: "공개 링크 중단" }).click();
-    await expect(page.getByTestId("share-revoked")).toContainText("공유 링크를 중단했습니다");
+    await page.getByRole("button", { name: "공유 중단" }).click();
+    await expect(page.getByTestId("share-status")).toContainText("공유 링크를 중단했습니다");
     expect((await anonymous.goto(link))?.status()).toBe(404);
   });
 
   test("종료 후 보관 흐름과 초안 삭제", async ({ page }) => {
     await loginAs(page, ACCOUNTS.admin);
     await writeNotice(page, "E2E 상태 흐름", "내용");
-    await page.getByRole("button", { name: "게시", exact: true }).click();
+    await publish(page);
     await expect(page.getByTestId("notice-status")).toHaveText("게시 중");
-    await page.getByRole("button", { name: "종료" }).click();
-    await expect(page.getByTestId("notice-status")).toHaveText("종료");
-    await page.getByRole("button", { name: "보관" }).click();
+    await page.getByRole("button", { name: "게시 종료" }).click();
+    await expect(page.getByTestId("notice-status")).toHaveText("게시 종료");
+    await page.getByRole("button", { name: "공지 보관" }).click();
     await expect(page.getByTestId("notice-status")).toHaveText("보관");
 
     await writeNotice(page, "E2E 삭제 대상", "내용");
-    await page.getByRole("button", { name: "삭제" }).click();
+    await page.getByRole("button", { name: "초안 삭제" }).click();
     await expect(page).toHaveURL(/\/notices\/manage$/);
-    await expect(page.getByTestId("manage-list")).not.toContainText("E2E 삭제 대상");
+    await expect(page.locator("main").getByText("E2E 삭제 대상")).toHaveCount(0);
   });
 });

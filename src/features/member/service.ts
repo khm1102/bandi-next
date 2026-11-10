@@ -36,6 +36,8 @@ export interface MemberListFilter {
   teamId?: number;
   status?: MemberStatus;
   role?: Role;
+  cohortId?: number;
+  ssoLinkStatus?: string;
   page?: number;
   pageSize?: number;
 }
@@ -319,6 +321,8 @@ export function createMemberService(deps: MemberServiceDeps) {
         filter.teamId ? eq(member.teamId, filter.teamId) : undefined,
         filter.status ? eq(member.status, filter.status) : undefined,
         filter.role ? eq(member.role, filter.role) : undefined,
+        filter.cohortId ? eq(member.cohortId, filter.cohortId) : undefined,
+        filter.ssoLinkStatus ? eq(member.ssoLinkStatus, filter.ssoLinkStatus) : undefined,
         keyword
           ? or(ilike(member.name, `%${escapeLike(keyword)}%`), ilike(member.studentNo, `%${escapeLike(keyword)}%`))
           : undefined,
@@ -406,6 +410,8 @@ export interface MemberView {
   role: Role;
   status: MemberStatus;
   ssoLinkStatus: string;
+  academicStatus: string | null;
+  academicStatusVerifiedAt: Date | null;
   lastLoginAt: Date | null;
   profilePhotoFileId: number | null;
 }
@@ -422,6 +428,8 @@ function toMemberView(row: typeof member.$inferSelect, includePhone: boolean): M
     role: row.role as Role,
     status: row.status as MemberStatus,
     ssoLinkStatus: row.ssoLinkStatus,
+    academicStatus: row.academicStatus,
+    academicStatusVerifiedAt: row.academicStatusVerifiedAt,
     lastLoginAt: row.lastLoginAt,
     profilePhotoFileId: row.profilePhotoFileId,
   };

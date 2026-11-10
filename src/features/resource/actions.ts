@@ -6,6 +6,7 @@ import { z } from "zod";
 import { runAction, type ActionState } from "@/lib/action-result";
 import { requirePrincipal } from "@/lib/session";
 import { InvalidInputError } from "@/features/member/errors";
+import { renderMarkdown } from "@/features/notice/markdown";
 import { resourceService } from "./instance";
 
 const schema = z.object({ title: z.string().max(400), body: z.string().max(200_000) });
@@ -64,4 +65,14 @@ export async function issueResourceShareAction(_prev: ActionState, formData: For
     async (memberId, id) => `/share/resources/${await resourceService().issueShare(memberId, id)}`,
     "",
   );
+}
+
+/** 작성 중 본문 미리보기. 저장 전이라 첨부 이미지는 해석하지 않고, 정화된 HTML만 돌려준다. */
+export async function previewResourceMarkdownAction(markdown: string): Promise<{ ok: boolean; html: string; message: string | null }> {
+  await requirePrincipal("/resources");
+  try {
+    return { ok: true, html: renderMarkdown(String(markdown).slice(0, 200_000), { allowExternalImages: false }).value, message: null };
+  } catch {
+    return { ok: false, html: "", message: "미리보기를 만들 수 없습니다." };
+  }
 }

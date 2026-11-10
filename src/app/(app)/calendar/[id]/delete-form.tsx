@@ -1,6 +1,6 @@
 "use client";
 
-import { ActionForm } from "@/components/ui";
+import { ConfirmForm } from "@/components/bandi/confirm-form";
 import type { ActionState } from "@/lib/action-result";
 
 export function DeleteEventForm({
@@ -11,9 +11,8 @@ export function DeleteEventForm({
   eventId: number;
 }) {
   return (
-    <ActionForm action={action} submitLabel="일정 삭제">
+    <ConfirmForm action={action} confirmMessage="이 일정을 삭제할까요?" label="일정 삭제" className="inline-flex min-h-11 items-center justify-center rounded-md bg-destructive px-4 text-sm font-bold text-destructive-foreground hover:bg-destructive/90">
       <input type="hidden" name="eventId" value={eventId} />
-      <p className="text-sm text-muted-foreground">삭제한 일정은 목록과 캘린더에서 사라집니다.</p>
-    </ActionForm>
+    </ConfirmForm>
   );
 }

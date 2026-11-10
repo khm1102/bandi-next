@@ -6,7 +6,7 @@ import { buildCsp, newNonce } from "@/lib/csp";
  * 인가의 근거가 아니다: 실제 인증·인가는 모든 페이지·액션·핸들러가 서버에서
  * requirePrincipal()/서비스 정책으로 다시 검사한다.
  */
-const PUBLIC_PREFIXES = ["/login", "/share", "/privacy", "/support", "/_next", "/favicon.ico", "/manifest.webmanifest", "/service-worker.js", "/images"];
+const PUBLIC_PREFIXES = ["/login", "/share", "/_next", "/favicon.ico", "/manifest.webmanifest", "/service-worker.js", "/images"];
 
 function withCsp(response: NextResponse, csp: string): NextResponse {
   response.headers.set("Content-Security-Policy", csp);

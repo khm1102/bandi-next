@@ -15,8 +15,11 @@ async function itemId(name: string): Promise<number> {
 async function register(page: Page, name: string, opts: { individual?: boolean; photo?: boolean } = {}) {
   await page.goto("/props/new");
   await page.getByLabel("품목명").fill(name);
-  await page.getByLabel("분류").fill("소품");
-  if (opts.individual) await page.getByLabel("관리 방식").selectOption("INDIVIDUAL");
+  await page.getByLabel("분류").selectOption("PROP");
+  if (opts.individual) {
+    await page.getByText("추가 정보").click();
+    await page.getByLabel("관리 방식").selectOption("INDIVIDUAL");
+  }
   await page.getByLabel("보관 위치").fill("창고 A");
   if (opts.photo) {
     await page.getByLabel("사진 첨부").setInputFiles({ name: "item.png", mimeType: "image/png", buffer: PNG });
@@ -80,9 +83,9 @@ test.describe("소품·장비", () => {
     await loginAs(page, ACCOUNTS.admin);
     await register(page, "E2E 삭제 소품");
     const id = await itemId("E2E 삭제 소품");
-    await page.getByRole("button", { name: "삭제" }).click();
+    await page.getByRole("button", { name: "품목 삭제" }).click();
     await expect(page).toHaveURL(/\/props$/);
-    await expect(page.getByTestId("props-list")).not.toContainText("E2E 삭제 소품");
+    await expect(page.locator("main").getByText("E2E 삭제 소품")).toHaveCount(0);
 
     const member = await (await browser.newContext()).newPage();
     await loginAs(member, ACCOUNTS.memberA);
@@ -92,7 +95,7 @@ test.describe("소품·장비", () => {
     await expect(page.getByTestId("props-list")).toContainText("E2E 삭제 소품");
     await page.getByRole("button", { name: "복구" }).click();
     // 복구되면 삭제됨 목록에서 사라진다.
-    await expect(page.getByTestId("props-list")).not.toContainText("E2E 삭제 소품");
+    await expect(page.locator("main").getByText("E2E 삭제 소품")).toHaveCount(0);
     await page.goto("/props");
     await expect(page.getByTestId("props-list")).toContainText("E2E 삭제 소품");
   });
@@ -101,8 +104,9 @@ test.describe("소품·장비", () => {
     await loginAs(page, ACCOUNTS.admin);
     await page.goto("/props/new");
     await page.getByLabel("품목명").fill("E2E 잘못된 소유");
-    await page.getByLabel("분류").fill("소품");
+    await page.getByLabel("분류").selectOption("PROP");
     await page.getByLabel("보관 위치").fill("창고");
+    await page.getByText("추가 정보").click();
     await page.locator('select[name="ownerType"]').selectOption("MEMBER");
     await page.getByLabel("소유 멤버 학번").fill("0000000000");
     await page.getByRole("button", { name: "저장" }).click();

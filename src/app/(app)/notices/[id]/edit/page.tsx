@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { Card } from "@/components/ui";
+import { Button } from "@/components/bandi/button";
+import { PageHead } from "@/components/bandi/page-head";
 import { memberService } from "@/features/member/instance";
 import { noticeService } from "@/features/notice/instance";
 import { guard } from "@/lib/page-errors";
@@ -18,22 +19,25 @@ export default async function EditNoticePage({ params }: PageProps<"/notices/[id
   const teams = canGlobal ? allTeams : allTeams.filter((t) => t.id === principal.teamId);
   return (
     <>
-      <h1 className="text-2xl font-black tracking-tight">공지 수정</h1>
-      <Card>
-        <NoticeEditor
-          teams={teams}
-          allowAll={canGlobal}
-          values={{
-            noticeId: notice.id,
-            targetScope: notice.targetScope,
-            teamId: notice.teamId,
-            title: notice.title,
-            body: notice.body,
-            important: notice.important,
-            attachments: notice.attachments.map((a) => ({ id: a.id, name: a.name, contentType: a.contentType })),
-          }}
-        />
-      </Card>
+      <div className="mx-auto max-w-5xl">
+        <PageHead title="공지 수정" description="동아리 멤버에게 전달할 내용을 작성하세요.">
+          <Button variant="outline" href="/notices">목록으로</Button>
+        </PageHead>
+      </div>
+      <NoticeEditor
+        teams={teams}
+        allowAll={canGlobal}
+        values={{
+          noticeId: notice.id,
+          targetScope: notice.targetScope,
+          teamId: notice.teamId,
+          title: notice.title,
+          body: notice.body,
+          important: notice.important,
+          attachments: notice.attachments.map((a) => ({ id: a.id, name: a.name, contentType: a.contentType })),
+        }}
+      />
+
     </>
   );
 }

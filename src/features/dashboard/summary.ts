@@ -35,10 +35,12 @@ export async function loadDashboard(principal: Principal) {
     reviewer ? activityService().searchReview(actor, { status: "SUBMITTED" }) : Promise.resolve(null),
   ]);
   return {
+    todayEvents,
     todayEventCount: todayEvents.length,
     upcoming,
     unreadNoticeCount: unread.total,
     latestNotices: notices.items.slice(0, 5),
+    notices: notices.items,
     cautionAssetCount: repair.total + lost.total,
     latestResources: resources.items.slice(0, 3),
     revisionRequestedCount: revisions.total,

@@ -1,58 +1,57 @@
-import Link from "next/link";
-import { Card } from "@/components/ui";
+import { ActivityCard } from "@/components/bandi/activity-card";
+import { EmptyState } from "@/components/bandi/empty-state";
+import { FilterChip } from "@/components/bandi/filter-chip";
+import { PageHead } from "@/components/bandi/page-head";
+import { Pagination } from "@/components/bandi/pagination";
 import { activityService } from "@/features/activity/instance";
 import { ACTIVITY_STATUS_LABEL } from "@/features/activity/labels";
-import { formatDateTime } from "@/lib/format";
+import { ACTIVITY_STATUSES, type ActivityStatus } from "@/features/activity/schema";
 import { requirePrincipal } from "@/lib/session";
+import { ActivityChoice } from "./activity-choice";
 
-export const metadata = { title: "활동 기록 · 반디" };
+export const metadata = { title: "내 활동 기록 · 반디" };
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export default async function ActivityPage({ searchParams }: PageProps<"/activity">) {
   const principal = await requirePrincipal("/activity");
-  const page = Math.max(1, Number((one((await searchParams).page))) || 1);
-  const result = await activityService().searchMine(principal.memberId, { page });
-  const isManager = principal.access.canManageGlobal() || (principal.access.leader && principal.access.active);
+  const params = await searchParams;
+  const page = Math.max(1, Number(one(params.page)) || 1);
+  const status = ACTIVITY_STATUSES.find((s) => s === one(params.status)) as ActivityStatus | undefined;
+  const result = await activityService().searchMine(principal.memberId, { status, page });
+  const href = (s: ActivityStatus | undefined, p = 1) => {
+    const q = new URLSearchParams();
+    if (s) q.set("status", s);
+    if (p > 1) q.set("page", String(p));
+    const query = q.toString();
+    return query ? `/activity?${query}` : "/activity";
+  };
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-black tracking-tight">내 활동 기록</h1>
-        <div className="flex flex-wrap gap-2 text-sm font-semibold">
-          <Link href="/activity/new" className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-primary-foreground hover:bg-primary-strong">
-            간단 기록 작성
-          </Link>
-          <Link href="/activity-documents" className="inline-flex min-h-11 items-center justify-center rounded-md border bg-card px-4 hover:bg-secondary">
-            활동 내역서(HWPX)
-          </Link>
-          <Link href="/activity/archive" className="inline-flex min-h-11 items-center justify-center rounded-md border bg-card px-4 hover:bg-secondary">
-            보관함
-          </Link>
-          {isManager ? (
-            <Link href="/activity/review" className="inline-flex min-h-11 items-center justify-center rounded-md border bg-card px-4 hover:bg-secondary">
-              검수
-            </Link>
-          ) : null}
-        </div>
+      <PageHead title="내 활동 기록" description="작성한 활동 기록의 검수 단계와 보완 요청을 확인합니다">
+        <ActivityChoice />
+      </PageHead>
+      <div className="mb-4">
+        <h2 className="text-lg font-black">내가 작성한 기록</h2>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">초안부터 최종 승인까지 현재 처리 단계를 확인할 수 있어요.</p>
       </div>
-      <Card>
-        <ul className="divide-y divide-border" data-testid="activity-list">
-          {result.items.length === 0 ? <li className="py-3 text-sm text-muted-foreground">활동 기록이 없습니다.</li> : null}
+      <div className="mb-4 flex flex-wrap gap-2">
+        <FilterChip href={href(undefined)} label="전체" active={!status} />
+        {ACTIVITY_STATUSES.map((s) => (
+          <FilterChip key={s} href={href(s)} label={ACTIVITY_STATUS_LABEL[s]} active={status === s} dot={s === "SUBMITTED"} />
+        ))}
+      </div>
+      {result.items.length === 0 ? (
+        <div className="rounded-lg border bg-card" role="status">
+          <EmptyState title={status ? "조건에 맞는 활동 기록이 없습니다" : "작성한 활동 기록이 없습니다"} message={status ? "다른 상태를 선택해 보세요." : "첫 활동 기록을 작성해 보세요."} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2" data-testid="activity-list">
           {result.items.map((a) => (
-            <li key={a.id} className="py-3">
-              <Link href={`/activity/${a.id}`} className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-bold">{ACTIVITY_STATUS_LABEL[a.status]}</span>
-                <span className="font-bold">{a.title}</span>
-                <span className="text-xs text-muted-foreground">
-                  {a.teamName} · {formatDateTime(a.activityAt)} · {a.participantCount}명
-                </span>
-              </Link>
-            </li>
+            <ActivityCard key={a.id} item={a} href={`/activity/${a.id}`} photoBase="/api/activity-management" mode="mine" />
           ))}
-        </ul>
-        <p className="mt-3 text-sm text-muted-foreground">
-          {result.page} / {Math.max(1, Math.ceil(result.total / result.pageSize))} 페이지 · 총 {result.total}건
-        </p>
-      </Card>
+        </div>
+      )}
+      <Pagination page={page} total={result.total} pageSize={result.pageSize} label="내 활동 기록 페이지" hrefFor={(p) => href(status, p)} />
     </>
   );
 }

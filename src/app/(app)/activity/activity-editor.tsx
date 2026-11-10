@@ -1,5 +1,6 @@
 "use client";
 
+import { DateTimeField } from "@/components/bandi/date-time-field";
 import { useState } from "react";
 import { ActionForm, Field, inputClass } from "@/components/ui";
 import { saveActivityAction } from "@/features/activity/actions";
@@ -54,9 +55,7 @@ export function ActivityEditor(props: {
         <input name="title" required maxLength={150} defaultValue={props.values.title} className={inputClass} />
       </Field>
       <div className="grid gap-3 md:grid-cols-2">
-        <Field label="활동 일시">
-          <input type="datetime-local" name="activityAt" required defaultValue={props.values.activityAt} className={inputClass} />
-        </Field>
+        <DateTimeField name="activityAt" label="활동 일시" required defaultValue={props.values.activityAt} />
         <Field label="참여 인원">
           <input type="number" name="participantCount" required min={1} defaultValue={props.values.participantCount} className={inputClass} />
         </Field>
