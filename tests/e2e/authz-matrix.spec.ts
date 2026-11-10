@@ -10,8 +10,8 @@ type Expectation = Record<Role, number>;
  */
 const PAGES: [string, Expectation][] = [
   ["/login", { anon: 200, member: 307, leader: 307, admin: 307 }],
-  ["/privacy", { anon: 200, member: 200, leader: 200, admin: 200 }],
-  ["/support", { anon: 200, member: 200, leader: 200, admin: 200 }],
+  ["/privacy", { anon: 307, member: 200, leader: 200, admin: 200 }],
+  ["/support", { anon: 307, member: 200, leader: 200, admin: 200 }],
   ["/dashboard", { anon: 307, member: 200, leader: 200, admin: 200 }],
   ["/calendar", { anon: 307, member: 200, leader: 200, admin: 200 }],
   ["/calendar/new", { anon: 307, member: 403, leader: 200, admin: 200 }],
@@ -33,10 +33,17 @@ const PAGES: [string, Expectation][] = [
   // 현행 정책 유지: 팀 멤버 화면은 팀장 전용(운영진은 /members 사용)
   ["/team-members", { anon: 307, member: 403, leader: 200, admin: 403 }],
   ["/members", { anon: 307, member: 403, leader: 403, admin: 200 }],
+  // 운영 관리: 운영진 전용
+  ["/admin", { anon: 307, member: 403, leader: 403, admin: 200 }],
+  ["/admin/settings", { anon: 307, member: 403, leader: 403, admin: 200 }],
+  ["/admin/accounts", { anon: 307, member: 403, leader: 403, admin: 200 }],
+  ["/admin/audit", { anon: 307, member: 403, leader: 403, admin: 200 }],
+  ["/admin/export", { anon: 307, member: 403, leader: 403, admin: 200 }],
 ];
 
 const API: [string, Expectation][] = [
   ["/api/activity-reviews/export", { anon: 401, member: 403, leader: 403, admin: 200 }],
+  ["/api/admin/export/members", { anon: 401, member: 403, leader: 403, admin: 200 }],
   ["/api/activity-documents/blank", { anon: 401, member: 200, leader: 200, admin: 200 }],
   ["/api/activity-documents/participants?q=Member", { anon: 401, member: 200, leader: 200, admin: 200 }],
 ];

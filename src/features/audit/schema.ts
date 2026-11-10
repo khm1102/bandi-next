@@ -9,10 +9,14 @@ export const AUDIT_ACTIONS = [
   "MEMBER_STATUS_CHANGED",
   "ASSET_DELETED",
   "ASSET_RESTORED",
+  "SETTINGS_CHANGED",
+  "MEMBER_PASSWORD_RESET",
+  "MEMBER_LOGIN_UNLOCKED",
+  "DATA_EXPORTED",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
-export const AUDIT_TARGET_TYPES = ["MEMBER", "ASSET"] as const;
+export const AUDIT_TARGET_TYPES = ["MEMBER", "ASSET", "SETTING", "EXPORT"] as const;
 export type AuditTargetType = (typeof AUDIT_TARGET_TYPES)[number];
 
 export const auditLog = pgTable(

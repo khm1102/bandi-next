@@ -15,5 +15,6 @@ export const NAV: NavDef[] = [
   { key: "props", href: "/props", label: "소품·장비", icon: "box", section: "관리" },
   { key: "team-members", href: "/team-members", label: "팀 멤버 관리", icon: "team", section: "관리", roles: ["LEADER"] },
   { key: "members", href: "/members", label: "멤버·권한", icon: "members", section: "관리", roles: ["ADMIN"] },
+  { key: "admin", href: "/admin", label: "운영 관리", icon: "chart", section: "관리", roles: ["ADMIN"] },
 ];
 
