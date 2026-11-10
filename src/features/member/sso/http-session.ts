@@ -1,3 +1,4 @@
+import https from "node:https";
 import { SchoolSsoResponseChangedError, SchoolSsoUnavailableError } from "../errors";
 
 export interface SchoolSsoHttpResponse {
@@ -41,8 +42,8 @@ export function createFetchSsoSession(options: SsoHttpOptions): SchoolSsoHttpSes
     return [...cookies].map(([name, value]) => `${name}=${value}`).join("; ");
   };
 
-  const storeCookies = (url: URL, headers: Headers): void => {
-    for (const line of headers.getSetCookie()) {
+  const storeCookies = (url: URL, setCookie: string[]): void => {
+    for (const line of setCookie) {
       const [pair] = line.split(";");
       const eq = pair.indexOf("=");
       if (eq <= 0) {
@@ -54,35 +55,58 @@ export function createFetchSsoSession(options: SsoHttpOptions): SchoolSsoHttpSes
     }
   };
 
-  const sendOnce = async (
-    url: URL,
-    init: { method: "GET" | "POST"; referer?: string; body?: string },
-  ): Promise<Response> => {
-    const headers: Record<string, string> = { "User-Agent": options.userAgent };
-    const cookie = cookieHeader(url);
-    if (cookie) {
-      headers.Cookie = cookie;
-    }
-    if (init.referer) {
-      headers.Referer = init.referer;
-    }
-    if (init.body !== undefined) {
-      headers["Content-Type"] = "application/x-www-form-urlencoded";
-    }
-    try {
-      const response = await fetch(url, {
-        method: init.method,
-        headers,
-        body: init.body,
-        redirect: "manual",
-        signal: AbortSignal.timeout(options.requestTimeoutMs),
-      });
-      storeCookies(url, response.headers);
-      return response;
-    } catch {
-      throw new SchoolSsoUnavailableError();
-    }
-  };
+  interface RawResponse {
+    status: number;
+    location: string | null;
+    setCookie: string[];
+    body: string;
+  }
+
+  /**
+   * 학교 포털(portal.tukorea.ac.kr)은 규격에 어긋난 헤더를 보내 엄격한 파서(fetch/undici)가 거부한다.
+   * 허용된 출처(allowedOrigins)로만 요청하므로 이 세션에 한해 느슨한 HTTP 파서를 켠다.
+   */
+  const sendOnce = (url: URL, init: { method: "GET" | "POST"; referer?: string; body?: string }): Promise<RawResponse> =>
+    new Promise((resolve, reject) => {
+      const headers: Record<string, string> = { "User-Agent": options.userAgent, "Accept-Encoding": "identity" };
+      const cookie = cookieHeader(url);
+      if (cookie) {
+        headers.Cookie = cookie;
+      }
+      if (init.referer) {
+        headers.Referer = init.referer;
+      }
+      if (init.body !== undefined) {
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["Content-Length"] = String(Buffer.byteLength(init.body));
+      }
+      const request = https.request(
+        url,
+        { method: init.method, headers, insecureHTTPParser: true, timeout: options.requestTimeoutMs },
+        (response) => {
+          const chunks: Buffer[] = [];
+          response.on("data", (chunk: Buffer) => chunks.push(chunk));
+          response.on("error", () => reject(new SchoolSsoUnavailableError()));
+          response.on("end", () => {
+            const raw = response.headers.location;
+            const setCookie = response.headers["set-cookie"] ?? [];
+            storeCookies(url, setCookie);
+            resolve({
+              status: response.statusCode ?? 0,
+              location: Array.isArray(raw) ? (raw[0] ?? null) : (raw ?? null),
+              setCookie,
+              body: Buffer.concat(chunks).toString("utf8"),
+            });
+          });
+        },
+      );
+      request.on("timeout", () => request.destroy(new Error("timeout")));
+      request.on("error", () => reject(new SchoolSsoUnavailableError()));
+      if (init.body !== undefined) {
+        request.write(init.body);
+      }
+      request.end();
+    });
 
   const send = async (
     start: URL,
@@ -96,13 +120,13 @@ export function createFetchSsoSession(options: SsoHttpOptions): SchoolSsoHttpSes
         return {
           statusCode: response.status,
           finalUrl: current,
-          body: await response.text(),
+          body: response.body,
         };
       }
       if (redirects >= MAX_REDIRECTS) {
         throw new SchoolSsoResponseChangedError();
       }
-      const location = response.headers.get("location");
+      const location = response.location;
       if (!location) {
         throw new SchoolSsoResponseChangedError();
       }
